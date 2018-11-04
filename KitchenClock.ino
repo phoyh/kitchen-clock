@@ -1,3 +1,4 @@
+#include <Encoder.h>
 #include <SevSeg.h>
 
 const long BAUD_RATE = 115200;
@@ -7,13 +8,34 @@ enum state currentState;
 //////////////////////////////////////////
 /// TURNABLE BUTTON
 //////////////////////////////////////////
+const byte CLK = A0;
+const byte DT = A1;
+Encoder meinEncoder(DT,CLK);
+
+int newPosition;
+int oldPosition;
+int offset;
 
 void initButton() {
   //TODO
 }
 
 bool hasButtonTurned() {
-  //TODO
+  newPosition = meinEncoder.read() / 4 * 3 + offset;
+  if (newPosition != oldPosition) {
+    return true;
+  }
+  return false;
+}
+
+int getPosition() {
+  Serial.println(meinEncoder.read());
+  newPosition = meinEncoder.read() / 4 * 3 + offset;
+  if (newPosition < 0) {
+    offset += 1;
+  }
+  oldPosition = newPosition;
+  return newPosition;
 }
 
 //////////////////////////////////////////
@@ -36,25 +58,59 @@ bool hasSetupInactiveForLongEnough() {
 //////////////////////////////////////////
 /// STATE HANDLERS
 //////////////////////////////////////////
+unsigned long introtimerOffset;
+const long INTRO_DELAY = 250;
+byte introPosition;
+char helloText[] = "    Hello Grandma";
+char currentIntroText[8];
+
+long timerOffset;
+
+const int DIPLAYSECONDS_TURN = 2000;
+
+long time;
 
 void initIntro() {
-  //TODO
+  timerOffset = millis() + INTRO_DELAY;
+  introPosition = 0;
 }
 
 void handleIntro() {
-  //TODO
+  if (millis() > (timerOffset + INTRO_DELAY)) {
+      setCurrentIntroText();
+      display.setChars(currentIntroText);
+      introPosition++;
+      timerOffset = millis();
+  }
+}
+
+void setCurrentIntroText() {
+  if (introPosition + 4 > strlen(helloText)) {
+    return;
+  }
+  for (byte i = 0; i < 4; i++) {
+    currentIntroText[i] = helloText[i + introPosition];
+  }
 }
 
 void initSetup() {
-  //TODO
+  timerOffset = millis();
 }
 
 void handleSetup() {
-  //TODO
+  if (hasButtonTurned()) {
+    time = getPosition() * 10;//DIPLAYSECONDS_TURN * 10;
+    time = convertSecondToDisplaySecond(time);
+    display.setNumber(time, 2);
+  }
+}
+
+long convertSecondToDisplaySecond(long t) {
+  return t / 60 * 100 + t % 60;
 }
 
 bool isSetupInactiveForLongEnough() {
-  //TODO
+  return false;
 }
 
 void handleCountdown() {
