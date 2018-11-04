@@ -12,30 +12,25 @@ const byte CLK = A0;
 const byte DT = A1;
 Encoder meinEncoder(DT,CLK);
 
-int newPosition;
+int currentPosition;
 int oldPosition;
-int offset;
 
 void initButton() {
-  //TODO
+  currentPosition = getCurrentButtonPosition();
 }
 
 bool hasButtonTurned() {
-  newPosition = meinEncoder.read() / 4 * 3 + offset;
-  if (newPosition != oldPosition) {
-    return true;
-  }
-  return false;
+  oldPosition = currentPosition;
+  currentPosition = getCurrentButtonPosition();
+  return oldPosition != currentPosition;
 }
 
-int getPosition() {
-  Serial.println(meinEncoder.read());
-  newPosition = meinEncoder.read() / 4 * 3 + offset;
-  if (newPosition < 0) {
-    offset += 1;
-  }
-  oldPosition = newPosition;
-  return newPosition;
+int getCurrentButtonPosition() {
+  return meinEncoder.read() / -4;
+}
+
+int getButtonPositionBeforeLastTurnCheck() {
+  return oldPosition;
 }
 
 //////////////////////////////////////////
@@ -60,27 +55,32 @@ bool hasSetupInactiveForLongEnough() {
 //////////////////////////////////////////
 unsigned long introtimerOffset;
 const long INTRO_DELAY = 250;
+const long BUTTON_TURN_SECONDS = 30;
 byte introPosition;
 char helloText[] = "    Hello Grandma";
 char currentIntroText[8];
 
-long timerOffset;
+long nextEventMillis;
 
-const int DIPLAYSECONDS_TURN = 2000;
+const int COUNTDOWN_STARTS_AFTER_MILLIS = 2000;
 
-long time;
+long currentTime;
+
+int buttonSetupInitPosition;
+long setupInitTime;
 
 void initIntro() {
-  timerOffset = millis() + INTRO_DELAY;
+  currentTime = 0;
+  nextEventMillis = millis();
   introPosition = 0;
 }
 
 void handleIntro() {
-  if (millis() > (timerOffset + INTRO_DELAY)) {
+  if (millis() > nextEventMillis) {
       setCurrentIntroText();
       display.setChars(currentIntroText);
       introPosition++;
-      timerOffset = millis();
+      nextEventMillis = millis() + INTRO_DELAY;
   }
 }
 
@@ -93,36 +93,67 @@ void setCurrentIntroText() {
   }
 }
 
-void initSetup() {
-  timerOffset = millis();
-}
-
-void handleSetup() {
-  if (hasButtonTurned()) {
-    time = getPosition() * 10;//DIPLAYSECONDS_TURN * 10;
-    time = convertSecondToDisplaySecond(time);
-    display.setNumber(time, 2);
-  }
+void displayCurrentTime() {
+  display.setNumber(convertSecondToDisplaySecond(currentTime), 2);
 }
 
 long convertSecondToDisplaySecond(long t) {
   return t / 60 * 100 + t % 60;
 }
 
-bool isSetupInactiveForLongEnough() {
-  return false;
+long getNewCurrentTime() {
+  return (getCurrentButtonPosition() - buttonSetupInitPosition) * BUTTON_TURN_SECONDS + setupInitTime;
 }
 
-void handleCountdown() {
-  //TODO
+void initSetup() {
+  nextEventMillis = millis() + COUNTDOWN_STARTS_AFTER_MILLIS;
+  setupInitTime = currentTime;
+  buttonSetupInitPosition = getButtonPositionBeforeLastTurnCheck();
+  currentTime = getNewCurrentTime();
+  displayCurrentTime();
+}
+
+void handleSetup() {
+  int currentButtonPosition = getCurrentButtonPosition();
+  if (hasButtonTurned()) {
+    currentTime = getNewCurrentTime();
+    bool isBeyondLimits = false;
+    if (currentTime < 0) {
+      currentTime = 0;
+      isBeyondLimits = true;
+    }
+    if (currentTime > 5999) {
+      currentTime = 5999;
+      isBeyondLimits = true;
+    }
+    if (isBeyondLimits) {
+      setupInitTime = currentTime;
+      buttonSetupInitPosition = currentButtonPosition;
+    }
+    displayCurrentTime();
+    nextEventMillis = millis() + COUNTDOWN_STARTS_AFTER_MILLIS;
+  }
+}
+
+bool isSetupInactiveForLongEnough() {
+  return millis() > nextEventMillis;
 }
 
 void initCountdown() {
-  //TODO
+  nextEventMillis = millis();
+}
+
+void handleCountdown() {
+  if (millis() > nextEventMillis) {
+    nextEventMillis = millis() + 1000;
+    currentTime--;
+    if (currentTime < 0) currentTime = 0;
+    displayCurrentTime();
+  }
 }
 
 bool isCountdownCompleted() {
-  //TODO
+  return currentTime == 0;
 }
 
 void initBeeping() {
