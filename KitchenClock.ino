@@ -1,12 +1,14 @@
 #include <Encoder.h>
 #include <SevSeg.h>
+#include <pitches.h>
 
 const long BAUD_RATE = 115200;
+const byte SOUNDPIN = A2;
 enum state { intro, clockSetup, countdown, beeping};
 enum state currentState;
 
 //////////////////////////////////////////
-/// TURNABLE BUTTON
+////TURNABLE BUTTON///////////////////////
 //////////////////////////////////////////
 const byte CLK = A0;
 const byte DT = A1;
@@ -34,12 +36,13 @@ int getButtonPositionBeforeLastTurnCheck() {
 }
 
 //////////////////////////////////////////
-/// DIGIT DISPLAY
+////DIGIT DISPLAY/////////////////////////
 //////////////////////////////////////////
 
 const byte DIGITNUMBER = 4;
 const byte DIGITPINS[] = {2, 3, 4, 5};
 const byte SEGMENTPINS[] = {6, 7, 8, 9, 10, 11, 12, 13};
+
 SevSeg display;
 
 void initDisplay() {
@@ -51,16 +54,15 @@ bool hasSetupInactiveForLongEnough() {
 }
 
 //////////////////////////////////////////
-/// STATE HANDLERS
+////STATE HANDLERS////////////////////////
 //////////////////////////////////////////
-
 const long INTRO_DELAY = 250;
 const long BUTTON_TURN_SECONDS = 60;
 byte introPosition;
 char helloText[] = "    Hello Grandma";
 char currentIntroText[8];
 
-long nextTimerMillis[2];
+long nextTimerMillis[3];
 
 const long COUNTDOWN_STARTS_AFTER_MILLIS = 2000;
 const long RESENSIBILIZE_AFTER_MILLIS = 500;
@@ -69,6 +71,10 @@ long currentTime;
 
 int buttonSetupInitPosition;
 long setupInitTime;
+
+const int TONE_DURATION = 100;
+int melody[] = { NOTE_C5, NOTE_E5, NOTE_C5, NOTE_G4 };
+byte nextPlayedNoteIndex;
 
 void setTimer(byte timerId, long millisUntilEvent) {
   nextTimerMillis[timerId] = millis() + millisUntilEvent;
@@ -183,17 +189,24 @@ bool isCountdownCompleted() {
 }
 
 void initBeeping() {
-  //TODO
+  setTimer(2, TONE_DURATION);
+  nextPlayedNoteIndex = 0;
 }
 
 void handleBeeping() {
-  //TODO
+  if (isTimerReady(2)) {
+    tone(SOUNDPIN, melody[nextPlayedNoteIndex++], TONE_DURATION);
+    setTimer(2, TONE_DURATION + 10);
+  }
+  if (sizeof(melody) <= nextPlayedNoteIndex * 2) {
+    nextPlayedNoteIndex = 0;
+    setTimer(2, TONE_DURATION * 4);
+  }
 }
 
 //////////////////////////////////////////
-/// MAIN FUNCTIONS
+////MAIN FUNCTIONS////////////////////////
 //////////////////////////////////////////
-
 void setup() {
   Serial.begin(BAUD_RATE);
   initDisplay();
